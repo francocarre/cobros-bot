@@ -1,0 +1,17 @@
+{
+  "name": "cobros-bot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "test:parser": "node scripts/test-parser.js"
+  },
+  "dependencies": {
+    "imapflow": "^1.0.180",
+    "mailparser": "^3.7.2"
+  }
+}

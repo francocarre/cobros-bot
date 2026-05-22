@@ -1,0 +1,44 @@
+name: Cobros bot
+
+on:
+  schedule:
+    # Cada 5 minutos. GitHub Actions tiene jitter — puede demorar hasta ~15 min en horas pico.
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: cobros-bot
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm install --no-audit --no-fund
+
+      - name: Run
+        run: node src/index.js
+        env:
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          GMAIL_LABEL: ${{ secrets.GMAIL_LABEL }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
+      - name: Commit data (si hubo cambios)
+        run: |
+          git config user.name "cobros-bot"
+          git config user.email "cobros-bot@users.noreply.github.com"
+          git add data/
+          git diff --staged --quiet || git commit -m "data: actualizar historial"
+          git push
