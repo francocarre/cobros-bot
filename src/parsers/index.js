@@ -12,7 +12,7 @@ export function parseTransfer({ from, subject, text, html }) {
   const ctx = { from, subject, text: body, html };
 
   let parsed = null;
-  if (lowerFrom.includes("letsbit")) parsed = parseLetsbit(ctx);
+  if (lowerFrom.includes("letsbit") || lowerFrom.includes("lbfinanzas")) parsed = parseLetsbit(ctx);
   else if (lowerFrom.includes("copter")) parsed = parseCopter(ctx);
   else if (lowerFrom.includes("bipago")) parsed = parseBipagos(ctx);
 

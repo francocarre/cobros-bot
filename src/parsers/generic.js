@@ -43,7 +43,7 @@ export function parseGeneric({ from, subject, text }) {
 function providerFromEmail(from) {
   if (!from) return null;
   const f = from.toLowerCase();
-  if (f.includes("letsbit")) return "letsbit";
+  if (f.includes("letsbit") || f.includes("lbfinanzas")) return "letsbit";
   if (f.includes("copter")) return "copter";
   if (f.includes("bipagos") || f.includes("bipago")) return "bipagos";
   if (f.includes("mercadopago") || f.includes("mercado-pago")) return "mercadopago";

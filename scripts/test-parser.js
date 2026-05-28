@@ -16,6 +16,16 @@ const cases = [
     },
   },
   {
+    name: "LB Finanzas 2026 — mail HTML real (sample Tincho)",
+    input: {
+      from: "LB Finanzas 🚀 <no-reply@lbfinanzas.com>",
+      subject: "Nuevo depósito recibido",
+      text: "",
+      html: `<html><body><table><tr><td>Recibiste</td></tr><tr><td>1.195,80 ARS</td></tr><tr><td>Detalle del depósito</td></tr><tr><td>Origen</td><td>Carlos Daniel Garay Broggi</td></tr><tr><td>CBU/CVU</td><td>0000168300000022179821</td></tr><tr><td>Fecha</td><td>25.05.26 14:35</td></tr><tr><td>Comisión</td><td>4,20 ARS</td></tr></table></body></html>`,
+    },
+    expect: { amount: 1195.8, payer: "Carlos Daniel Garay Broggi", provider: "letsbit" },
+  },
+  {
     name: "Copter — formato con monto en body",
     input: {
       from: "noreply@copter.com.ar",
