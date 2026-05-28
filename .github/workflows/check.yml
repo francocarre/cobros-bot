@@ -2,7 +2,8 @@ name: Cobros bot
 
 on:
   schedule:
-    # Cada 5 minutos. GitHub Actions tiene jitter — puede demorar hasta ~15 min en horas pico.
+    # Cada 5 min. El script corre un loop interno de ~4 min poleando cada 15s,
+    # entonces la latencia real es <15s salvo el gap de ~1 min entre runs.
     - cron: "*/5 * * * *"
   workflow_dispatch:
 
@@ -12,6 +13,7 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 6
     concurrency:
       group: cobros-bot
       cancel-in-progress: false

@@ -40,29 +40,29 @@ function formatTelegramMessage({ provider, amount, payer, date, subject }) {
   return lines.join("\n");
 }
 
-async function main() {
-  // 1) Validar env.
-  const missing = REQUIRED_ENV.filter((k) => !process.env[k]);
-  if (missing.length > 0) {
-    console.error(`Faltan variables de entorno: ${missing.join(", ")}`);
-    process.exit(1);
-  }
+// Loop de polling activo dentro del mismo run de GitHub Actions.
+// El cron arranca cada 5 min; durante ~4 min hacemos polling cada 15s y salimos
+// limpio antes del próximo cron. Latencia max ≈ 15s salvo el gap entre runs.
+const LOOP_DURATION_MS = 4 * 60 * 1000;
+const POLL_INTERVAL_MS = 15 * 1000;
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function processIteration({ env }) {
   const {
     GMAIL_USER,
     GMAIL_APP_PASSWORD,
     GMAIL_LABEL,
     TELEGRAM_BOT_TOKEN,
     TELEGRAM_CHAT_ID,
-  } = process.env;
+  } = env;
 
-  // 2) Procesar comandos antes que mails (responde rápido si Franco-cliente escribió).
+  // 1) Telegram updates (comandos como /saldo).
   try {
     const updates = await consumeUpdates({ token: TELEGRAM_BOT_TOKEN });
     for (const upd of updates) {
       const msg = upd.message;
       if (!msg || !msg.text) continue;
-      // Solo respondemos en el chat del dueño.
       if (String(msg.chat.id) !== String(TELEGRAM_CHAT_ID)) continue;
       await handleCommand({
         token: TELEGRAM_BOT_TOKEN,
@@ -74,7 +74,7 @@ async function main() {
     console.error("Telegram updates error:", e.message);
   }
 
-  // 3) Pull de mails UNSEEN.
+  // 2) Mails UNSEEN.
   let pulled;
   try {
     pulled = await fetchUnseen({
@@ -84,14 +84,13 @@ async function main() {
     });
   } catch (e) {
     console.error("IMAP error:", e.message);
-    process.exit(1);
+    return; // próxima iteración reintenta
   }
 
   const { mails, mailbox } = pulled;
-  console.log(`Mails sin leer en "${mailbox}": ${mails.length}`);
+  if (mails.length > 0) console.log(`Mails sin leer en "${mailbox}": ${mails.length}`);
 
   const successfullyNotified = [];
-
   for (const mail of mails) {
     try {
       const parsed = parseTransfer({
@@ -102,11 +101,7 @@ async function main() {
       });
 
       if (!parsed || !parsed.amount) {
-        // No se pudo extraer monto: notificar a modo log y NO marcar como leído
-        // así el alumno revisa manual.
-        console.warn(
-          `Mail no parseado: from="${mail.from}" subject="${mail.subject}"`,
-        );
+        console.warn(`Mail no parseado: from="${mail.from}" subject="${mail.subject}"`);
         continue;
       }
 
@@ -118,11 +113,7 @@ async function main() {
         subject: mail.subject,
       });
 
-      await sendMessage({
-        token: TELEGRAM_BOT_TOKEN,
-        chatId: TELEGRAM_CHAT_ID,
-        text,
-      });
+      await sendMessage({ token: TELEGRAM_BOT_TOKEN, chatId: TELEGRAM_CHAT_ID, text });
 
       await appendTransfer({
         ts: new Date(mail.date).toISOString(),
@@ -137,11 +128,9 @@ async function main() {
       successfullyNotified.push(mail.uid);
     } catch (e) {
       console.error(`Error procesando UID ${mail.uid}:`, e.message);
-      // No marcamos como leído: el próximo run lo reintenta.
     }
   }
 
-  // 4) Marcar como leídos los mails notificados con éxito.
   if (successfullyNotified.length > 0) {
     try {
       await markSeen({
@@ -155,6 +144,25 @@ async function main() {
       console.error("markSeen error:", e.message);
     }
   }
+}
+
+async function main() {
+  const missing = REQUIRED_ENV.filter((k) => !process.env[k]);
+  if (missing.length > 0) {
+    console.error(`Faltan variables de entorno: ${missing.join(", ")}`);
+    process.exit(1);
+  }
+
+  const endTime = Date.now() + LOOP_DURATION_MS;
+  let iter = 0;
+  while (Date.now() < endTime) {
+    iter++;
+    await processIteration({ env: process.env });
+    const remaining = endTime - Date.now();
+    if (remaining <= 0) break;
+    await sleep(Math.min(POLL_INTERVAL_MS, remaining));
+  }
+  console.log(`Loop terminado tras ${iter} iteraciones.`);
 }
 
 main().catch((e) => {
